@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Armador de stock de adjudicados</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{--blue:#0071B8;--blue-soft:#e6f1f8;--ink:#1A1A1A;--muted:#5f6670;--line:#e3e6ea;--bg:#F2F2F2;--card:#fff;--warn:#b26a00;--warn-bg:#fff5e0;--bad:#b3261e;--bad-bg:#fdecea;--ok:#1e7a46;--ok-bg:#e7f5ec}
+*{box-sizing:border-box}
+body{margin:0;font-family:'Poppins',system-ui,sans-serif;color:var(--ink);background:var(--bg);font-size:14px}
+header{background:#fff;border-bottom:3px solid var(--blue);padding:14px 24px;display:flex;align-items:center;gap:18px}
+header img{height:38px}
+header h1{font-weight:600;font-size:18px;margin:0}
+header p{margin:0;color:var(--muted);font-size:12px}
+main{max-width:1200px;margin:0 auto;padding:22px 18px 60px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px}
+.card h2{font-size:14px;font-weight:600;margin:0 0 4px}
+.card .hint{color:var(--muted);font-size:12px;margin:0 0 10px}
+.step{display:inline-flex;width:22px;height:22px;border-radius:50%;background:var(--blue);color:#fff;font-size:12px;align-items:center;justify-content:center;margin-right:6px}
+.drop{border:2px dashed #c6ccd3;border-radius:8px;padding:16px;text-align:center;cursor:pointer;color:var(--muted);font-size:12px;transition:.15s}
+.drop:hover,.drop.over{border-color:var(--blue);background:var(--blue-soft);color:var(--blue)}
+.drop input{display:none}
+.files{margin-top:8px;font-size:12px}
+.files div{padding:4px 8px;background:var(--bg);border-radius:6px;margin-top:4px;display:flex;justify-content:space-between;gap:8px}
+.files .tag{font-weight:600;color:var(--blue)}
+.files .x{cursor:pointer;color:var(--muted)}
+.opt{font-weight:400;color:var(--muted);font-size:11px}
+.bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:18px 0 10px}
+button{font-family:inherit;font-size:13px;font-weight:600;border-radius:8px;border:1px solid var(--blue);background:var(--blue);color:#fff;padding:9px 16px;cursor:pointer}
+button.sec{background:#fff;color:var(--blue)}
+button:disabled{opacity:.4;cursor:not-allowed}
+.date{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+.date input{font-family:inherit;border:1px solid var(--line);border-radius:6px;padding:6px 8px}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 14px}
+.chip{background:#fff;border:1px solid var(--line);border-radius:999px;padding:5px 12px;font-size:12px}
+.chip b{font-weight:600}
+.chip.new{border-color:var(--blue);color:var(--blue)}
+.chip.out{border-color:var(--bad);color:var(--bad)}
+.msgs{margin:0 0 12px}
+.msg{padding:9px 12px;border-radius:8px;font-size:12px;margin-bottom:6px}
+.msg.warn{background:var(--warn-bg);color:var(--warn)}
+.msg.err{background:var(--bad-bg);color:var(--bad)}
+.msg.ok{background:var(--ok-bg);color:var(--ok)}
+details{background:#fff;border:1px solid var(--line);border-radius:10px;margin-bottom:10px}
+summary{cursor:pointer;padding:10px 14px;font-weight:600;font-size:13px}
+.tw{overflow:auto;max-height:560px;border-top:1px solid var(--line)}
+table{border-collapse:collapse;width:100%;font-size:12px}
+th{position:sticky;top:0;background:var(--blue);color:#fff;font-weight:600;text-align:left;padding:7px 8px;white-space:nowrap}
+td{padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+tr:nth-child(even) td{background:#fafbfc}
+tr.isnew td{background:var(--blue-soft)}
+td.miss{background:var(--warn-bg)!important;color:var(--warn)}
+td.num{text-align:right;font-variant-numeric:tabular-nums}
+.badge{display:inline-block;padding:1px 8px;border-radius:999px;font-size:11px;font-weight:600}
+.b-disponible{background:var(--ok-bg);color:var(--ok)}
+.b-reservado{background:var(--warn-bg);color:var(--warn)}
+.b-no{background:#eceff1;color:#555}
+.b-nuevo{background:var(--blue);color:#fff;margin-left:4px}
+.empty{color:var(--muted);text-align:center;padding:40px;font-size:13px}
+#copyArea{width:100%;height:120px;font-family:monospace;font-size:11px;margin-top:8px;display:none}
+</style>
+</head>
+<body>
+<header>
+  <img alt="Grupo Opencars" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAZAAAAB8CAMAAABwkBazAAAAwFBMVEVhp9KjzednqdXY5vA2jsYqjMkAGH4otLdVoM80j8gEe/WRt+IIdLl+/v4gn94Md7ocgL4CbbdFmcx9vr4Hc7mGu9wAMLmkzOZbW60egL4VfsAWfsE/f3+qqqoA/wBVVf/D2eofgr6/f7//AAD/AH//AP//f///v7///wAAAAACcrgGesP+/v4Ug8gAfr4AbbYoiMQ+f74A//8AVaoAAP8piMQricRVqqpVqv9Imcx/f39/f/9JmswtisQAf386ksnaYX2ZAAAAQHRSTlNWICwcZ98CBKSwAiCjAgnQ2hbTBFhdA0oDrc6eBAMBA0RzBAECAQIEAQD9/gf6BPzzBAEDAc+vAwOSAgJvkgKR4Hz+jQAAHrVJREFUeNrtXQl3o7qSBmy8xo6T7izdfe+bN/sIBGb3bv//fzVVWkACge2ku9MzMeedd++NERL1SbVXYZHb9Udd1h+0FgrXZ5n1jwdkG6fsn2m4avyWius5DeOtTsx0kOr3HtOUNgamz2G8M4LRMeunBmSbqnt13XXrYPfWSRo0p3N11uENkPICWtjWOI+iKC82DhBdOQeU0NF4zP43GvUt+LU8Ewn8NBqp/CYjcNeUzAQvglFjMXDvNEgOAFHrhLNGxQnpsLsBwuk6JPYp8H1/uVzC/3s5rGlSHR7Sw9/Kq3DKH2ekFy0jSrYKILkfPJEvAslIGcceq14h6Z0iPqsH/3D79I84JH8AIBnZBz5A4UWu63k+/K+wK/6yRap7LrsioJwX7CVPMwHieiogcqCLA/0NTZNKvhALZvXYrBGbNbdJfAOE0CHdAGGCjdVDbu7scwAncMirCkjEfqO0ZxX+MrAEXMYTogMSiIHUKrwlQFniHJMRgBCMLRt/nfbHsIbI6RZfnwOQFRkFS39sVwhtkFJTkmiAlD/Dr4Gd0UsBmZa/9YHkDjmWeMCs+VQhRODh3avPDsiKWLDnN8BCVgls1WwXwpqAveRwcrQTwnZyMhwAU/L3nNtfAohNv7CB6wdSeP4BJEc5qw/6QLpOYNpkB+qvDfzS7U3o5wZkkk0Dzz8BHJWMjxm1pKSQJ4RrTmQOO90ruFy/CBC55+MMcM7FFMceUL+gA4VDzYnNVhJ/bkD+BVlQTp6prv8UgQ+kpAZAYG973j1Q/lpAjmQOA6lgWHgsqa7nzvGPnqMoeJ8QEArbculbtW15JM6Pux8Op1cNkAl58Px7LmCuB2RBOcp0UfK96oqRqZ0EU/ukgOBW9XJ67GDcNUDWCYxYvOGErBIHjxY/ZQ4ckF5Wm/UvZGoBzegnBuRIxsZNmYRhSEmbDPELbq1fBcic7JE5JowlbspnqJMSCorWR6u+HwtIRu89zyq5SvgcKpcBEPA+AZUlj7tI7d05u91usoKBuef3GfYhGft+P2lsgyH95jX456cCZMuM6WmnE0kCMhBSpwCO1RtcwbKkuBqDddPLEnYScrQuGyfhGYxFf/O5AbG9cveD/jQu1GvI+IsEhHEw28o9pOXrxZa65bDLOqFXxmJ2YcZ+eCHT+nJC8tX37z5YqlsfK0KcCpCQHDQvov/ANFDuy8r5BT4nv8TjEkA8ecHzYOCQ34Sy4gZIKzuy5QnZK8cDaFgB4i25wxYJeyjdHxcBUjp73YP0iyRtJ2SAwv70mQGhaBB4jkGGIC353/kJGd/B5S29vq3Ery4BZMSur+BDLH36yZHL94YMCf+98ME8+cQyBPYk2GJWJkiQyIjrPAWbwaOKDGES5IB6q+JkaQHEMgp1UrnegTn6QuGq6b0LlDOfWe0N6QktgucGM+9Lm0EK9XA+eUarvq9s4JmQ9zoggtVJQIZfhsM4Xe8y1Rzdo3F5rM26y6bAFYXH5pMCwm1mO9nVt2ppMyh2CNJx6WsMDs0YR6Fsxv+wMxiGKuVRufOn2aruNjih2yD91M7FlN5BJI/Ma5QBmMA8OeqAZEPk/aqFjQfCtxI1urgAn4gwIlsBAWXrgAdTFxa7ge0vP9wu/GhAeGDC0RBZEeoiSsO6pf7KzpNVkZgJg0Pln43JvHSxdwGS4oOA9qpjd/tMCuZXyz53gCpFMgDZ5tsqNwet8aB3TBqukyGT63SSKHB69z1JcxqqrrEOQOBv8CBwWz1I9od6xYiBlH7yiOF2gJG6AHN/wvjLMAR69Ma+4tlQATlCOGupOjcSPEsFJc/hly8x4LAPqjBtFyA0pbmP+hj4S2IYOsDIcbAMPj4+9fEx9SMZfoeteZL6KbXQDrQgdGVwLq5QP/Ir5xccEYBgPC2j8cugL8McXYCA2uDgrJBTJGeF3IpgpKalfNo0oDVxMNHEg2S1J6s/XnDvSGyMhyQTLtfDivfsAzBZiv3T0x48L8tgLGPx3YCgplXgrPlpj7PmmAe0p4Tesk6QNrQf+NLJAe6qYqpwDkyUq+Ih7EioxhtLr2KeKhzqnyqadgOCfE2b1cdEOnrLyxK0sfu5oExwUrNF+QkJ3DJAhfH2IGJudImIfco5XXFo9QMA8hi4rYCQZEB6+1zCUVj0w+X5n5PbmwELora1H1n9KWzSVE9xn9kv9rRi/r2XlxebZGpiMHX6o5HlUA1JkPgw0O5klujQtyDz18G8r1dyA6Q6B5Uhkl6b80zDtw6lyqzrjNwA0U7Jbh0P4+HKoOb8baue8mQ6rTvOk9k8HoYr2j3QvBPWYcustwqq23UD5AbI7boB8v8LkN1stpvRG5n+AEDoKlRinFDFmtyI9XGA0LWwsHq2bffECflzSoc/GyDbkPk/94f8fhGAo8JzwfGHaRtZfDsmvx+QJEU0ioAlQi3xYmlm4Bd1TMXet+sXAwKuoR4WKXuNy/fH4IEbbG9E+42AwPHooVfaeEF1LPqohzeq/TZAjoSFF1ovSM2Eetn0RrbfBMiaQOKa13ktMZwX3iyT3wIIC6Z6Zy8oYh7ctK3fAEhMXoIL8MAMdDq/nZFfDsiM2JF32QXJaTc58qsBgeIZt6noyhyAZQORZ3JBzGk1jEMI/1zqdtmtILsKBqyv9NPQ3RpSqr+8XqyRzyYxpGB/We/oxeGzV5hhGE+uVfrpahiaXBywZHjel8muDRAoTa7JD0gaKDb7vmV9tTCLoCZHLF37NcQ/Vypk6dkcf7rWIB7EuwvaCGlunsvmgfu1OoTwfLRQ9p2TA2jHWyd6iNgcF56Fg+o/nteJCZA1VKZqcHiYh1Fe9v679jP2aZmRM+3bIG/B6n8FSNHt0l12MQvL+3EA5iuQbHVpWJw6Fl6OzSvZu+5PWBi9N7f4CMozvrtGHFO2ND7FnHXBmV90gJOUL+3rxtLyiybHaslzRpowawCyxm44Kh4sp28Qh6v1ehjj3qV77QZMsaWVemY9lteIJYjCk/FcBSxjCtwuVpfbhcLt0Hlpwe/HAW6xt5FRNPZfr5roEdKuWVe4AvJJwecG64N5aFdnOJbeAgsL+ABscnNCUIadAPb2xWLh8QGBe8ApVspbW1VxHKTfsT9t4Edc2n4c4Cs9qg8EOJxNEcgl37PnTWqAJJPed43ce2zPo8A6g8w121UPiVo6E7LmU+Lv9ywZx8oVjQ1L/dw9aZTIlKlVxDlwSbXktzPxVVikrjskUNlRHVJkm3QTMTfPUg5z4f3m7cfWwS5y4u4l58z5pte6tDUuLZBLkwMgxTHF/nOYx6rVEK3ZnzysHE0h/S8SHigFEKC8M/b1JX/fKzlhlnjQwdclRDOjJiRUv8kutyK2Rij/voD12eOgpgcAJuB2MTU/ggqZ6djsO4NjqrvOVEBYrrTlNgb6udOiA8Zo95omCoAixuMLbQAPdfGJr+JarDMh4yp1QDwOCJlWMvlR2RKQSu4vG0u2yuxYBsgxc7TfLeMeW2VYOlDdtSF/GQGhxIoacwqLkjS0lG2Ht4alhs5aAdmr09b2k2H9E9AjfUlTj5f1LiWHnhry3v9zoCxN+LzFiAAW5mAxRBMQdkISyFOtFvRYmRYKTL6yOUQJvQQk1A4IFKKaWxTNBpDqrLCM8ohogNzzdRrdLqNGOvO221vjFz1VG9AA8a1NsDTOE4wM5AXqSgqAmMrviuIb6+EoDslTQ+sAybaXALLC6ru7hRwBifO9tAOQigYI/GP5slMBMK7gR/Ejl0ytaj9o8cLthUqD1pZRf0HlkSZFwiYg/kJXD3T6PtY6/0ChxqPxNFWnWe28oQHiuV7LSFPjDNbUTzxyM+WtekGtO8kjAIis6vyqHAHp9Q4LnMKIDd/j/phm7YDQiPM2LypGd1+F5pRJ08L3DkKFpSg8K4koAInVPY0bf9aeDasyrZwOTCzL6yCwP9arkbEPzLLbK5Ardc86IB0uUNDKX2thHkYq2No5p8Ug5cZAby8giWxdPYtZ+Q83g7kaNQirWhL2Ku2AMDJBsMKm2hM5mVDK4bunjEv1hEIUUFYzZjHmqpDZH3UogRNN2JQVsWELMzfRd69uxFV94HLpNbwCBS0jx5cCgjBOdP1qyqkbbCiz7TLeahmNSluwdaVWThQ+lBIXsICWkDgiWYWiTyeIKqNQx2nu+TgckQ7CcF12dhEvVJqjFA0wzrOBMiEHBNh4oFK5yyBLqYqdXIoZkKXn+02lBvZuqlZF16Q43qEPQr3yry5AjN4dvVMDK/RhV5/UxAsAJ94JtJTq9AJrdSvy7eq2KGcpo5YTIlgaTKX6ZiQjcjWxSHbP4jws2BGx2FMUtpHT7FwLOEXaHNsBAbFVjIr7oKblqSIqoZr7LMj7lj0MgbHrXpxgKi1EAyDA3w97TMioYX9Pk8ZJRNHZ1LwhCiTmc6rqkljoObDcpo8hmWC5L3A5rxUQHBfXza2xAFDXYXfHXsA2noPMw8JxfV9VZrvqHnWKBEJpMgAC1g7nn/Ze98l4VV3zsNRiSmtAbkJVaVRq05uABH1RAUKdIqhNo5TFTTl1zUWdK2KLxjYlqSaJI/dnujKq0JUaZQTEpenfDfv3jo1x6n0ShJLLH2SVyJUK8bq70v+bQkSHy9smIPBwxj9T0aPYRN4kU1mlB8VOwFpnWTZDNt1zVabllI187JqosPFbE1DHgI+0tJ+Utj6hYNMuNUfWhuJ3rye1cmkIAIM1k2Mih5gBgRXHzU472C7KoDStM0toCSkHhN4r5JySTs/ZM1HMBrkLG4BE0IYh5u1FKOtR7Bt0gVA7IKDkzDWjOte8/aERENDASkff7FlHfqE1U6wfGt0YOtpyN8aCeIyL4MRxm+eQRh2AgILQ4PxH7PvhGbof7cgU7ZEg54AgcgpdzlSihhp/+8oJVQck0IhL5hp1y707UR3+QAtHF1a2+khqZFkwz5dqyP/MdQdQ2UZGCr4FnXS1L1AObykqZfuCDkKYADH1GoJHM+biW8cGyJT3veN2iNwN/Ol3Z5qvDNVtKPWSGiAN10usa1PcftmpJFdLnZUW1iXPEoxUB6S+f8EXrK9iLU91UVeH6nI9sVxoWOeOymgdH3Fo72b2j0xY0wZAKh5rEur1vtH1AJXujvh2Jjj7hTxV/gqwWQyAAHHrrjCVunADM8F0XcLJarx6lUwr9UweKm2t0NAnmdV2S+E3Y2gJ4bzCdy79ZItAdtlpApR6mIll9Qx8Rh472MYNuFZ47TggGZmYFJpWW93yz5wQv/mNAWi23ti7qUq9BU0bV2+hGodNQFBxr71yZjX5KetZIxThdo0ees5kcJX2kfSTdjY8aAUkNwZjkt69IBtFEdt+QpwrANFPiAkQOJITA8dV2DtnNZkiWPyRaa5HX5XeScO52FjrVnuVk2gtK3Zmkyues7ZgxKCzP2HQCghNOsTOUvpOthewrLuzgFhnWJax5dQqU4xPRsmt1jQ04p+L0q5RpEnorAHI1zqFeX/GanEDwcj6fpugbRPY3AbvtslSrpS0BKjMurJgCvgBJmY/hY2As1Vrp3pOy4rPallGgaZJcDjRGWsRa0pwUT8bpXk8Vw1AGu30NZBLQJ6F3bW/OCtZWmpW54hUtecuAgQ8OIXYl+h/t5jPMl3Vkxykfiy34sV2yNJkhyh92rUEEcXD7+PnJlY6IOe8t44BEOtSQHC/L2W30osAufMb/jBiavN7HSC4+Ut/Pzrucu6GV8OzVk26wv6edbetLJqHQRfq1LySSAUkAeK8BMuLEfHfAYhUN62Li1s4IMZ25E1mcQ0gyH0g6uyrjIFhUiW+WHWBuz/jy6odp60hYmgGxH0HIMufAIjsVnoFIE9nANlfDQhmEEBL9TJSyVzirN/OpALE7MFtbyPqNTzDFwHynhNiliFXAfIGlvULTohIhrL3RaBEDHzvVBZ5WHWBu7Cz7VlxV3MxaTIkaJEh3jtkiLAl3ydDrCsA4Uzua6fK+QYZIiAZsDZEB7eK/GCRx7yMqU/o4kKeRRMt+i53kC5DTAYxOMBVxy7TsoZXAAIfj8reCoiBcGcB2fjn2XcV37gSEPwU84AF6PlB0awFq0HPezq5TOlFB0HSBMT4Gk22qBPvXx/Ch66L53y+DZChMPNOlySIqxYccIAutffIN+dbAGGYsNXgpzJ9+TqpAGSncQ8gqNPaQrQXeAaHoA6IydjXWd2GW+oL1aq+0Mn0BkBW0u6m844nr/Fa6dunM3pKZYj8bYDgnCt2UByht0Y9zMixSD3LwRRcKX2EB9+Ua6MfsWbrcIxQL875so6ZeiXZRP38UfIOQGRygejuTy770IwIDm3PRrPfDkjJvHh8mbMWSzw70MM+KzMe6m1KYkfNudj8BEeN1U1RH481//o0Wf2qEwL7bcENkWzd/twXyEV/csoe8u5ZsTORuREXA7J2vsDVlPGSfDk6Sy3BDnM9nc3APMHfqsGmKIX1eEg97hlDEo7yMw8UzbR4SD3ykGTTuSJD7PcAIiK4HdEN2ByYix64ouQjFv6InLbaANvM8b33nxBGWRnLRi+JJVxNWgTJh0yVWrY1jYmeIqpmj9QjhnlP21nDWsRQePm0XeDXkmt1oXNP3wOIlJHQvnzXdkJyzAkr/Y8z9jmAjqAvvtS3awF5enmCa2p6Fo+HYZKmpUdb1MxyzCfD7DD4YjDmEEB/h6WeX/XaBgjmHpS5TJAKRt3aATLE1AHEoZospaJvjqlfDAjSu9N7+5cUB+VXw+VmcWmYnLGQLwUEPuXATqHB9xpmp9IzYMnEYm0Ty4odRjZ21fs7wDJWpA0Qnq8P6X4hS9fUi63LoGSS2Pd6WjVPLINvN5PaiZXC9Y2AhCJw1ZZDEosdWnGosIruGY2AXYr0Wl4DCFNilkuRoGjQQTVA4N+edE8GuCI3jo1JyfD9d+tQqxjgKSutgOANTpkv1ZYIHeqB3aiqCKYt3PGNgBCR5Yx5wjujsuJ7NfejTHWEvz0Y8BgwCK8S6lKJyZvyeSscfZUM0XKL1cTOKLpbuJ7XyAh1e2oljSlz0ffvx1BgCL3c/XqqrlwQfMo81zMXWXIdne1rmYvOewFZSZJDfue6GTZ6CYTamGqfGJFZ8YNdg7acwz9eA4gMAMEReahvCMcvkz8sNV+/noi+9AxYiCSqNekGRAad6rnTgVJesNL1BPR8eov7+pTwBq/kfYCUqXKYqaupK3Q9IU+RtL/Uel4xAk80CWeZYkJOsAwKJZt1letEGl4wj1YNLbOkuLlgqQM2F/pfAY9X0gpI5zMCLfs9bWS/m2p2SJq9F5AklKUZLJwNHQtn0E1yxRIeZaBbd/kkIkILP4xt/p2RyWQyZEIRKsSY0taW/W4GZCWVf99SloDJ9CJ5gH35RAGEPpP9RZ5Xd1qjRM0w7KoP0TMNoCq2OFMfAkHlyZa8FxA4lb2oJt2EtBIaYFC3Umg2/S7LnU5OFXXrWWNfnJzrTgj/+ommMakrEJnFln6orPPdTpAPx6QdkHzkd1VQDajuHaOPnTP6Wh3N2wHBjOpcZhi4J6hp7/WgVLyIpPJ6anzVXalJhMrbQ//p4WEOnxoRHBXwSK4EBOg7EocONCaxhI1clcu/JmPVxIs97kYEHfcNRboWoDq1cT6YtJnXSscdjNLPe+ps7wAEC2DL/HjMpI0ipewS+FXzeoWUb18J7Cm1K/zDutcCArtx5NeXUJluR0NHuTVWmPvtkVQfPi80oKQLEMgu25ufgKWr22Y+Ch7LNgRHulvtPYDg198UBsB6SSplyab+Rltsl+AbZByKlfh6QNC5ua/qZZQl+IWIhjd6LkIPBtp3/ZaCKOR9w9aAjsw6H1Rn3dPtjMxgBYAxZhtqt6VlsuuqU78KEPRoOtBaoV5r5Uf9XktoEEZMD83qrIiVOSEgy2WzcQD8qT3JQRTlL3XCBpDocGzrSsqbkqpV3KJIO8JYvLEHZg0QLCbY1wrTIJLfa8sDxBKxQpuP0wkbHCTk5wHC+mRMT26V84X/Uux7pD39AbtMKCPwX7CRA4a5h5hAAq0z9hogLrbM6HAuhqKbhPZAu+paY+jbm4Q8DJ/L7DWYNOBdRAavXSHPqi5jxRqEKNlvudXr6HUChi+ZbnL1c+oRy44ZNt3kFUONTIBUuS3ByLABjviBvOl+9APY9yLKiw1LIOz6NtuObVCghrsAMxkGTIno+EHJFL2FL7ZWJcz+1BVHwT4w1NmP72AJHixh/0SJkp1umcNnA9kBp9/v7y1ryrvmrLpj0EqhTMZAhdI/+Hb23Z69dWejxhVXKK2vo9EYBzA10+jXo8rV/at5vl2o3Mi/KXmmaZY6gpvQ72ynt0prD1Srf9t6v+/iGlcN1/RcUoBWuURDbX+efYlZ7ZCn61/WRXAVP4uXew7j7eWxVsLK59RvI2PEydG7sWAMypmdbWtWLmFQ+zKQ1dkQLp7HcM1XK3pJlka9lAw+YvT8nMJLX0hbaLIWQhkCDIhnrUxEifJ2/9z9TSkoTcjoVX3rKMz4U/cIWwL5Jd8PaQHkdpEP+qDLDZAbIDdAfiogQg1K5H+p/+gep9+pP0fkVnbMqD+GNIWIrqAl5Wd1W9I4W4zJ5hrPEuP/zgkZXvMBZzQayGB90dde33kxy0CZKu1UIlK9fG3VeKlUWgUfAkjNUij3Pb3yhNQtjjUaT9TUvpWaTwjtPiEdR5dZd5QYbE/jKSYdzgD9hg8ABILLboSXyxq/QUpIDv8HeS/RvEHKjI7HMtKdkdeogPsg8pZzZ6wlniPq1cGHVkTYpap+AGLyxO50XzABHpzgLqR+QCqou6mlK8kHPhLWeXT0aGP+k/VYr0sAlduCKF9QWHzFUMl8x1LlIdkM2rLGwM0e2TMSSh/xid83itc6oYexEr5/dCM3GoM/7fhBgOxI/3Qq/OIE/WxnCMg91otATQaU1GSNZJugrFjJSLpEJ1FK7pc8ecrawHO+bU59VgCxQ0/q3abAWFM9Uc8K8s3ptGFeDuyoAMEHB0LpPzSf04q8jE5jP9qcWKNdAB5LK6DtWD09C2oFD4FXbAp0ZL2ypT3wekuIugRjbAxAo0gUOEUerDIPohKCHTb6U1LwPO90+pZjftDuA2XIQ2CV/p92QLCuMhK1IQiIJwDxyjuc4KviacUGNtD+KujrXi4ExNJi24AZAmLIZewFo+q+FkAm8KcDchk74L2NMhJ6dUByCQhDxvKDqt1bn72UNOcXd7xDT2CjM/xDADk+hF+Dfshz6boAgVJwaOEo3KlNQCbz0Aq+huFE9HaBOitIBcO8PL10FQGBb2yIlhbQJil6hEwDAyBb6NYVjF4f1p2AQIVTAKE2qKAg8O1vPL/dgNBwjo1xCpHUgmn/T0HltPfu44cQbzjUkhx+4wlJydfyJTsAQUIeaHDP5Z3hhOCpEKXZSIpv7JFzRsFh7TmjUlQjID1gWonhhOBTqlK4FkAwE3jPHLSTMiuxExCQGjGgwIuOkA0fCGTHZiUgMBX0CY88LEn/owGBMonA+Y9CdJjqBoSdgoQBkvQDvacA/gaCE5SIrQAEOqRtyFsBGUC7Uid55Y3hs4sAwdcTdZKQphg4/1ZUKaUMEOx3A2kn2R8NCDavuEfuyhvBvQ+Q+7u78ag6IQh1zz0LiN0CiD+/FhD6A9D9u3wpp9oMAhD6pwGSNQBhnObl5cXjx5sBAoGWNDOzrGkny1KFOgCS9QK3F4y7ARkHPTqLJ1eyrOK/DCxrCDUqlJfFwEv98+WfQVnPzwGZkcUfwrIgKxyWOgmhIqBW4oQdzgLXhQAquxcreRcknAxoOYcCSCnUH1qEeviQzml1QkDveewG5Bl5C5k/wD+m9VQLzJ8JDUIdYpbYLiYe0AD7hyhC3RGlflh6oLyUKtS//RlCHVlCn+l9hd48DZWZ+z6GLAOeQ/YMCi2udx/IGi0VkErtHZ9TexGQORDG72RZ2LkXe73agfffddm2Yb801V54eM6mwjMUKmqv4/MMZcax+EvJWsxS7Z0mP1PtXYrL3DjAAIjU+5Kklwd3h7tKUdc4A1syPzv4lSz/7nQXRHZ2bAByhWGIgEwzO+gG5B9QtBYsDgXmYO3qDRe5YRhAPtdONQzJLnOC4NvhLvjOSjiFYfjtXiCnvFQOlX1HbhhuTmNIKPiphuHIDeQVXQTIg1vyZejfdoq8aFxvv5nRx9yGmOV80Hd5kwtIKxjjnWU3RWgi5lZdl8B1Mr7IdTIGhkPhALiNCh4AxC2TI4BHbuC9CqtZw5DhB1K8YOzUXCesZ1cBVDjZosEXd53cy1YNoGO5duzEcbqXFOBL609/ousE3EIv5WVfNkTx2CXiP5O2eyi1Syct7Wl3ah7J65yLCWlJk2gsbGd2LuJKjgbPEB/U5lzslS/V+2XOxXcDyrzmO3LmG1vSv55uO/M5LnG/X3724XmrVvf7fGVwv7M11j5TlYZn2j1OZIrNTwKE2lN5/X3pqTof7Km2dPud9KKo0aUBqsYDOxIbaOtPNEna4k9V1IvQXxegul0/7/pfAUxvIs9vRi8AAAAASUVORK5CYII=">
+  <div><h1>Armador de stock de adjudicados</h1><p>Plan de Ahorro · genera la LISTA_PARA_STOCK_ADJUDICADOS</p></div>
+</header>
+<main>
+  <div class="grid">
+    <div class="card">
+      <h2><span class="step">1</span>Reporte del día</h2>
+      <p class="hint">El stock de adjudicados del día anterior (CSV de OpenApp). Se quitan los "Boleto creado"; el resto mantiene su estado.</p>
+      <label class="drop" id="dropRep">Arrastrá o hacé clic para subir el CSV<input type="file" id="inRep" accept=".csv,.xlsx,.xls"></label>
+      <div class="files" id="fRep"></div>
+    </div>
+    <div class="card">
+      <h2><span class="step">2</span>Nuevos adjudicados <span class="opt">(una vez al mes)</span></h2>
+      <p class="hint">Excel de cálculo de Chevrolet y/o de Peugeot-Citroën. Se agregan las unidades con <b>precio</b> cargado que todavía no están en el stock.</p>
+      <label class="drop" id="dropCalc">Arrastrá o hacé clic para subir uno o dos Excel<input type="file" id="inCalc" accept=".xlsx,.xls,.xlsm" multiple></label>
+      <div class="files" id="fCalc"></div>
+    </div>
+  </div>
+
+  <div class="bar">
+    <button id="btnDl" disabled>Descargar CSV</button>
+    <button id="btnCopy" class="sec" disabled>Copiar CSV</button>
+    <label class="date">Fecha del archivo <input type="date" id="fecha"></label>
+    <span id="fname" class="opt"></span>
+  </div>
+  <textarea id="copyArea" readonly></textarea>
+
+  <div class="msgs" id="msgs"></div>
+  <div class="chips" id="chips"></div>
+  <div id="out"><div class="card empty">Subí el reporte del día para empezar.</div></div>
+</main>
+
+<script>
+const OUT_HEADER = ['idv','estado','marca','modelo','version','precio ','bonificacion','detalle','valor ultima cuota','cuotas pendientes','cuotas pagas','grupo y orden','tipo plan','cuota pura','reserva','observacion'];
+const FIELDS = ['idv','estado','marca','modelo','version','precio','bonificacion','detalle','valor ultima cuota','cuotas pendientes','cuotas pagas','grupo y orden','tipo plan','cuota pura','reserva','observacion'];
+const NUM_FIELDS = new Set(['precio','bonificacion','valor ultima cuota','cuotas pendientes','cuotas pagas','cuota pura']);
+const REQUIRED_NEW = ['modelo','version','precio','valor ultima cuota','cuotas pendientes','cuotas pagas','grupo y orden','tipo plan','cuota pura'];
+const PLAN_LETRA = {O:'80/20 84C', K:'70/30 84C', H:'100% 84C', J:'70/30 120C', Q:'60/40 84C'};
+const MODELOS_2_PALABRAS = ['ONIX PLUS'];
+const CITROEN = ['C3','C4','C5','BASALT','AIRCROSS','BERLINGO','JUMPY','JUMPER','SPACETOURER','C-ELYSEE','AMI'];
+const MESES = 'enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre';
+
+let report = null;          // {name, rows:[obj]}
+let calcs = [];             // [{name, tipo, rows:[obj], skipped:{...}, warns:[]}]
+let result = null;
+
+const $ = id => document.getElementById(id);
+const norm = s => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/\s+/g,' ').trim();
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+// ---------- números ----------
+function parseNum(v){
+  if (v === null || v === undefined) return null;
+  if (typeof v === 'number') return isFinite(v) ? v : null;
+  let s = String(v).trim().replace(/\$|\s/g,'');
+  if (s === '') return null;
+  const hasDot = s.includes('.'), hasCom = s.includes(',');
+  if (hasDot && hasCom){
+    if (s.lastIndexOf(',') > s.lastIndexOf('.')) s = s.replace(/\./g,'').replace(',','.');
+    else s = s.replace(/,/g,'');
+  } else if (hasCom){
+    s = (s.match(/,/g).length > 1) ? s.replace(/,/g,'') : s.replace(',','.');
+  } else if (hasDot && (s.match(/\./g).length > 1)){
+    s = s.replace(/\./g,'');
+  }
+  const n = Number(s);
+  return isFinite(n) ? n : null;
+}
+function fmtNum(n){
+  if (n === null || n === undefined || n === '') return '';
+  const r = Math.round(n * 10000) / 10000;
+  return String(r).replace('.', ',');
+}
+
+// ---------- CSV ----------
+function parseCSV(text){
+  text = text.replace(/^﻿/, '');
+  const first = text.split(/\r?\n/)[0] || '';
+  const sep = (first.split(';').length >= first.split(',').length) ? ';' : ',';
+  const rows = []; let row = [], cur = '', q = false;
+  for (let i = 0; i < text.length; i++){
+    const c = text[i];
+    if (q){
+      if (c === '"'){ if (text[i+1] === '"'){ cur += '"'; i++; } else q = false; }
+      else cur += c;
+    } else if (c === '"') q = true;
+    else if (c === sep){ row.push(cur); cur = ''; }
+    else if (c === '\n' || c === '\r'){
+      if (c === '\r' && text[i+1] === '\n') i++;
+      row.push(cur); rows.push(row); row = []; cur = '';
+    } else cur += c;
+  }
+  if (cur !== '' || row.length){ row.push(cur); rows.push(row); }
+  return rows.filter(r => r.some(x => String(x).trim() !== ''));
+}
+function csvCell(v){
+  const s = String(v ?? '');
+  return /[;"\r\n]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s;
+}
+
+// ---------- archivos ----------
+function readFile(file){
+  return new Promise((res, rej) => {
+    const fr = new FileReader();
+    fr.onerror = () => rej(fr.error);
+    if (/\.csv$/i.test(file.name)){ fr.onload = () => res({csv: fr.result}); fr.readAsText(file, 'utf-8'); }
+    else { fr.onload = () => res({buf: fr.result}); fr.readAsArrayBuffer(file); }
+  });
+}
+function sheetRows(buf){
+  if (typeof XLSX === 'undefined') throw new Error('No se pudo cargar el lector de Excel. Revisá la conexión y recargá la página.');
+  const wb = XLSX.read(buf, {type:'array'});
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  return XLSX.utils.sheet_to_json(ws, {header:1, raw:true, defval:null, blankrows:false});
+}
+
+// ---------- reporte del día ----------
+const REP_MAP = {
+  'estado':'estado','marca':'marca','modelo':'modelo','version':'version','precio':'precio',
+  'bonificacion':'bonificacion','detalle':'detalle','valor ultima cuota':'valor ultima cuota',
+  'cuotas pendientes':'cuotas pendientes','cuotas pagas':'cuotas pagas','grupo y orden':'grupo y orden',
+  'tipo plan':'tipo plan','cuota pura':'cuota pura','reserva':'reserva','observacion':'observacion','idv':'idv'
+};
+function loadReport(rows){
+  const head = rows[0].map(norm);
+  const idx = {};
+  head.forEach((h,i) => { if (REP_MAP[h] && idx[REP_MAP[h]] === undefined) idx[REP_MAP[h]] = i; });
+  const missing = ['estado','marca','modelo','grupo y orden'].filter(f => idx[f] === undefined);
+  if (missing.length) throw new Error('El reporte no tiene las columnas: ' + missing.join(', ') + '. ¿Es el CSV de stock de adjudicados?');
+  return rows.slice(1).map(r => {
+    const o = {};
+    FIELDS.forEach(f => { o[f] = idx[f] !== undefined ? (r[idx[f]] ?? '') : ''; });
+    return o;
+  });
+}
+
+// ---------- excel de cálculo ----------
+function findCol(head, tests){
+  for (const t of tests){
+    const i = head.findIndex(h => typeof t === 'string' ? h === t : t.test(h));
+    if (i >= 0) return i;
+  }
+  return -1;
+}
+function splitModelo(txt){
+  const s = String(txt ?? '').trim().replace(/\s+/g,' ');
+  const up = s.toUpperCase();
+  for (const m of MODELOS_2_PALABRAS){
+    if (up === m || up.startsWith(m + ' ')) return [s.slice(0, m.length), s.slice(m.length).trim()];
+  }
+  const sp = s.indexOf(' ');
+  return sp < 0 ? [s, ''] : [s.slice(0, sp), s.slice(sp + 1)];
+}
+function normPlan(txt){
+  const s = String(txt ?? '').toUpperCase();
+  const cuotas = (s.match(/(\d{2,3})\s*C(UOTAS)?\b/) || [])[1] || '84';
+  const ratio = s.match(/(\d{2,3})\s*[\/X]\s*(\d{2,3})/);
+  if (ratio) return `${+ratio[1]}/${+ratio[2]} ${cuotas}C`;
+  if (/100\s*%/.test(s)) return `100% ${cuotas}C`;
+  return null;
+}
+function planPeugeot(letra, texto){
+  const L = String(letra ?? '').trim().toUpperCase();
+  if (/^[A-Z]$/.test(L) && PLAN_LETRA[L]) return PLAN_LETRA[L];
+  const m = String(texto ?? '').trim().toUpperCase().match(/^([A-Z])-PLAN/);
+  if (m && PLAN_LETRA[m[1]]) return PLAN_LETRA[m[1]];
+  return normPlan(texto);
+}
+function cell(r, i){ return i >= 0 ? r[i] : null; }
+function isBlank(v){ return v === null || v === undefined || String(v).trim() === ''; }
+function gyo(v){
+  const s = String(v ?? '').trim().replace(/\//g, '-');
+  const m = s.match(/^(\d+)\s*-\s*(\d+)$/);
+  return m ? `${m[1]}-${m[2].padStart(3,'0')}` : s;
+}
+
+function loadCalc(rows, name){
+  const head = rows[0].map(norm);
+  const has = h => head.includes(h);
+  const isPeu = has('suscripcion') || has('cuota actual') || (has('grupo y orden') && has('pvp') && !has('orden'));
+  const isChev = has('grupo') && has('orden') && has('valor ultima cuota');
+  const tipo = isPeu ? 'peugeot' : isChev ? 'chevrolet' : null;
+  if (!tipo) throw new Error(`"${name}": no reconozco el formato (no es el Excel de cálculo de Chevrolet ni el de Peugeot/Citroën).`);
+
+  const cPrecio = findCol(head, ['precio']);
+  const cBoni = findCol(head, ['boni','bonificacion','bonif','bonificacion ']);
+  const warns = [];
+  if (cPrecio < 0) warns.push(`"${name}": no encontré la columna "precio". Agregala para que las unidades se incluyan.`);
+  if (cBoni < 0) warns.push(`"${name}": no encontré la columna "boni" / "bonificación"; queda vacía.`);
+
+  let C;
+  if (tipo === 'chevrolet'){
+    C = {
+      gyo: 0, grupo: findCol(head,['grupo']), orden: findCol(head,['orden']),
+      modelo: findCol(head,['modelo']), plan: findCol(head,['tipo plan']),
+      ultima: findCol(head,['valor ultima cuota']), pura: findCol(head,['cuota pura']),
+      pagas: findCol(head,['cuotas totales']), pend: findCol(head,['cuotas pendientes'])
+    };
+  } else {
+    const planIdx = head.map((h,i) => h === 'tipo plan' ? i : -1).filter(i => i >= 0);
+    C = {
+      gyo: findCol(head,['grupo y orden']), modelo: findCol(head,['modelo']),
+      planIdx, ultima: findCol(head,[new RegExp('^cuota (' + MESES + ')')]),
+      pura: findCol(head,['cuota pura']), pagas: findCol(head,['cuotas pagas'])
+    };
+    if (C.ultima < 0) warns.push(`"${name}": no encontré la columna "Cuota <mes>" (valor última cuota).`);
+  }
+
+  const out = []; const skip = {sinPrecio:0, vacias:0};
+  for (const r of rows.slice(1)){
+    let g;
+    if (tipo === 'chevrolet'){
+      g = gyo(cell(r, C.gyo));
+      if (!/^\d+-\d+$/.test(g) && !isBlank(cell(r,C.grupo))) g = gyo(`${cell(r,C.grupo)}-${cell(r,C.orden)}`);
+    } else g = gyo(cell(r, C.gyo));
+    const modeloTxt = cell(r, C.modelo);
+    if (!/^\d+-\d+$/.test(g) || isBlank(modeloTxt)){ skip.vacias++; continue; }
+    if (isBlank(cell(r, cPrecio))){ skip.sinPrecio++; continue; }
+
+    const [modelo, version] = splitModelo(modeloTxt);
+    let plan, pagas, pend, marca;
+    if (tipo === 'chevrolet'){
+      marca = 'chevrolet';
+      plan = normPlan(cell(r, C.plan)) || String(cell(r, C.plan) ?? '').trim();
+      pagas = parseNum(cell(r, C.pagas));
+      pend = parseNum(cell(r, C.pend));
+    } else {
+      marca = CITROEN.includes(modelo.toUpperCase()) ? 'citroen' : 'peugeot';
+      const letras = C.planIdx.map(i => r[i]);
+      plan = null;
+      for (const v of letras){ plan = planPeugeot(v, v); if (plan) break; }
+      pagas = parseNum(cell(r, C.pagas));
+      const plazo = plan ? +(plan.match(/(\d+)C$/) || [])[1] : null;
+      pend = (plazo && pagas !== null) ? plazo - pagas : null;
+    }
+    out.push({
+      idv:'', estado:'disponible', marca, modelo, version,
+      precio: parseNum(cell(r, cPrecio)), bonificacion: parseNum(cell(r, cBoni)),
+      detalle:'', 'valor ultima cuota': parseNum(cell(r, C.ultima)),
+      'cuotas pendientes': pend, 'cuotas pagas': pagas, 'grupo y orden': g,
+      'tipo plan': plan || '', 'cuota pura': parseNum(cell(r, C.pura)),
+      reserva:'', observacion:'', _new:true
+    });
+  }
+  return {name, tipo, rows: out, skip, warns};
+}
+
+// ---------- armado ----------
+function build(){
+  if (!report){ result = null; render(); return; }
+  const msgs = [];
+  const kept = [], removed = [];
+  const enStock = new Set();
+  for (const r of report.rows){
+    const g = gyo(r['grupo y orden']);
+    enStock.add(g);
+    const est = norm(r.estado);
+    if (est === 'boleto creado'){ removed.push(r); continue; }
+    const o = {};
+    FIELDS.forEach(f => {
+      let v = r[f];
+      if (NUM_FIELDS.has(f)) v = parseNum(v);
+      else v = String(v ?? '').trim();
+      o[f] = v;
+    });
+    o.idv = '';
+    o.estado = String(r.estado ?? '').trim().toLowerCase();
+    o.marca = String(r.marca ?? '').trim().toLowerCase();
+    o['grupo y orden'] = g;
+    kept.push(o);
+  }
+  const nuevos = [], yaEnStock = [], dupCalc = [];
+  const vistos = new Set();
+  for (const c of calcs){
+    c.warns.forEach(w => msgs.push(['warn', w]));
+    for (const n of c.rows){
+      if (enStock.has(n['grupo y orden'])){ yaEnStock.push(n); continue; }
+      if (vistos.has(n['grupo y orden'])){ dupCalc.push(n); continue; }
+      vistos.add(n['grupo y orden']); nuevos.push(n);
+    }
+  }
+  const order = {chevrolet:1, citroen:2, peugeot:3, volkswagen:4};
+  nuevos.sort((a,b) => (order[a.marca]||9)-(order[b.marca]||9) || a.modelo.localeCompare(b.modelo) || a['grupo y orden'].localeCompare(b['grupo y orden']));
+  const faltantes = nuevos.filter(n => REQUIRED_NEW.some(f => n[f] === null || n[f] === ''));
+  if (faltantes.length) msgs.push(['warn', `${faltantes.length} unidad(es) nueva(s) con datos vacíos (marcados en naranja). Revisalos en el Excel de cálculo.`]);
+  if (dupCalc.length) msgs.push(['warn', `Grupo y orden repetido en los Excel de cálculo, se tomó la primera aparición: ${dupCalc.map(d=>d['grupo y orden']).join(', ')}`]);
+  const sinPrecio = calcs.reduce((a,c) => a + c.skip.sinPrecio, 0);
+  result = {rows: kept.concat(nuevos), kept, removed, nuevos, yaEnStock, sinPrecio, msgs};
+  render();
+}
+
+function toCSV(rows){
+  const lines = [OUT_HEADER.join(';')];
+  for (const r of rows){
+    lines.push(FIELDS.map(f => csvCell(NUM_FIELDS.has(f) ? fmtNum(r[f]) : r[f])).join(';'));
+  }
+  return '﻿' + lines.join('\r\n') + '\r\n';
+}
+function fileName(){
+  const d = $('fecha').value ? new Date($('fecha').value + 'T12:00') : new Date();
+  const dd = String(d.getDate()).padStart(2,'0'), mm = String(d.getMonth()+1).padStart(2,'0');
+  return `LISTA_PARA_STOCK_ADJUDICADOS_${dd}.${mm}.csv`;
+}
+
+// ---------- render ----------
+function badge(est){
+  const e = norm(est);
+  const cls = e === 'disponible' ? 'b-disponible' : e.startsWith('reservado') ? 'b-reservado' : 'b-no';
+  return `<span class="badge ${cls}">${esc(est)}</span>`;
+}
+function table(rows, opts = {}){
+  if (!rows.length) return '<div class="empty">Sin filas.</div>';
+  const cols = FIELDS.filter(f => f !== 'idv');
+  let h = '<div class="tw"><table><thead><tr>' + cols.map(c => `<th>${esc(c)}</th>`).join('') + '</tr></thead><tbody>';
+  for (const r of rows){
+    h += `<tr class="${r._new && !opts.plain ? 'isnew' : ''}">`;
+    for (const c of cols){
+      const v = r[c];
+      const miss = r._new && REQUIRED_NEW.includes(c) && (v === null || v === '');
+      if (c === 'estado') h += `<td>${badge(v)}${r._new && !opts.plain ? '<span class="badge b-nuevo">nuevo</span>' : ''}</td>`;
+      else if (NUM_FIELDS.has(c)) h += `<td class="num${miss?' miss':''}">${miss ? 'falta' : esc(typeof v === 'number' ? v.toLocaleString('es-AR',{maximumFractionDigits:2}) : v)}</td>`;
+      else h += `<td class="${miss?'miss':''}">${miss ? 'falta' : esc(v)}</td>`;
+    }
+    h += '</tr>';
+  }
+  return h + '</tbody></table></div>';
+}
+function render(){
+  $('fRep').innerHTML = report ? `<div><span><span class="tag">Reporte</span> ${esc(report.name)} · ${report.rows.length} filas</span><span class="x" data-x="rep">✕</span></div>` : '';
+  $('fCalc').innerHTML = calcs.map((c,i) => `<div><span><span class="tag">${c.tipo === 'chevrolet' ? 'Chevrolet' : 'Peugeot/Citroën'}</span> ${esc(c.name)} · ${c.rows.length} con precio</span><span class="x" data-x="${i}">✕</span></div>`).join('');
+  $('btnDl').disabled = $('btnCopy').disabled = !result;
+  $('fname').textContent = result ? fileName() : '';
+  $('copyArea').style.display = 'none';
+  if (!result){
+    $('chips').innerHTML = ''; $('msgs').innerHTML = window._err ? `<div class="msg err">${esc(window._err)}</div>` : '';
+    $('out').innerHTML = '<div class="card empty">Subí el reporte del día para empezar.</div>'; return;
+  }
+  const R = result;
+  const cnt = {};
+  R.kept.forEach(r => cnt[r.estado] = (cnt[r.estado]||0) + 1);
+  $('chips').innerHTML =
+    `<span class="chip"><b>${R.rows.length}</b> filas en la lista</span>` +
+    Object.entries(cnt).map(([k,v]) => `<span class="chip"><b>${v}</b> ${esc(k)}</span>`).join('') +
+    `<span class="chip out"><b>${R.removed.length}</b> boleto creado (salen)</span>` +
+    (calcs.length ? `<span class="chip new"><b>${R.nuevos.length}</b> nuevos agregados</span><span class="chip"><b>${R.yaEnStock.length}</b> ya estaban en stock</span><span class="chip"><b>${R.sinPrecio}</b> sin precio (afuera)</span>` : '');
+  $('msgs').innerHTML = (window._err ? `<div class="msg err">${esc(window._err)}</div>` : '') + R.msgs.map(([t,m]) => `<div class="msg ${t}">${esc(m)}</div>`).join('');
+  let h = `<details open><summary>Lista final (${R.rows.length})</summary>${table(R.rows)}</details>`;
+  if (R.nuevos.length) h += `<details><summary>Nuevos agregados (${R.nuevos.length})</summary>${table(R.nuevos,{plain:true})}</details>`;
+  if (R.removed.length) h += `<details><summary>Salen por boleto creado (${R.removed.length})</summary>${table(R.removed.map(r=>({...r, estado:r.estado})),{plain:true})}</details>`;
+  $('out').innerHTML = h;
+}
+
+// ---------- eventos ----------
+async function onReport(file){
+  window._err = null;
+  try{
+    const d = await readFile(file);
+    const rows = d.csv !== undefined ? parseCSV(d.csv) : sheetRows(d.buf);
+    if (!rows.length) throw new Error('El archivo está vacío.');
+    report = {name: file.name, rows: loadReport(rows)};
+  }catch(e){ report = null; window._err = e.message; }
+  build();
+}
+async function onCalc(files){
+  window._err = null;
+  for (const file of files){
+    try{
+      const d = await readFile(file);
+      const rows = d.csv !== undefined ? parseCSV(d.csv) : sheetRows(d.buf);
+      const c = loadCalc(rows, file.name);
+      calcs = calcs.filter(x => x.tipo !== c.tipo).concat(c);
+    }catch(e){ window._err = e.message; }
+  }
+  build();
+}
+function setupDrop(dropId, inputId, handler, multi){
+  const d = $(dropId), inp = $(inputId);
+  inp.addEventListener('change', () => { if (inp.files.length) handler(multi ? [...inp.files] : inp.files[0]); inp.value=''; });
+  d.addEventListener('dragover', e => { e.preventDefault(); d.classList.add('over'); });
+  d.addEventListener('dragleave', () => d.classList.remove('over'));
+  d.addEventListener('drop', e => { e.preventDefault(); d.classList.remove('over'); const f=[...e.dataTransfer.files]; if (f.length) handler(multi ? f : f[0]); });
+}
+setupDrop('dropRep','inRep', onReport, false);
+setupDrop('dropCalc','inCalc', onCalc, true);
+document.addEventListener('click', e => {
+  const x = e.target.dataset && e.target.dataset.x;
+  if (x === undefined) return;
+  if (x === 'rep') report = null; else calcs.splice(+x, 1);
+  build();
+});
+(() => { const d = new Date(); $('fecha').value = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; })();
+$('fecha').addEventListener('change', () => { $('fname').textContent = result ? fileName() : ''; });
+
+let downloads = null;
+(async () => { try{ if (window.claude && window.claude.use) downloads = await window.claude.use('downloads'); }catch(e){ downloads = null; } })();
+
+$('btnDl').addEventListener('click', async () => {
+  if (!result) return;
+  const csv = toCSV(result.rows);
+  if (downloads){
+    try{ await downloads.save({filename: fileName(), data: csv}); return; }
+    catch(e){ if (e && e.code === 'declined') return; }
+  }
+  try{
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8'}));
+    a.download = fileName(); document.body.appendChild(a); a.click(); a.remove();
+  }catch(e){}
+  showCopy(csv, 'Si la descarga no arrancó, usá "Copiar CSV" y pegalo en un archivo .csv.');
+});
+$('btnCopy').addEventListener('click', async () => {
+  if (!result) return;
+  const csv = toCSV(result.rows).replace(/^﻿/,'');
+  try{ await navigator.clipboard.writeText(csv); $('msgs').insertAdjacentHTML('afterbegin','<div class="msg ok">CSV copiado al portapapeles.</div>'); }
+  catch(e){ showCopy(csv, 'Seleccioná el texto de abajo y copialo.'); }
+});
+function showCopy(csv, txt){
+  const ta = $('copyArea'); ta.value = csv.replace(/^﻿/,''); ta.style.display = 'block';
+  $('msgs').insertAdjacentHTML('afterbegin', `<div class="msg warn">${esc(txt)}</div>`);
+}
+
+// hook de prueba
+window.__test = {parseCSV, loadReport, loadCalc, toCSV, gyo, normPlan, planPeugeot, splitModelo, parseNum, fmtNum,
+  run(repRows, calcList){ report = {name:'t', rows: loadReport(repRows)}; calcs = calcList.map(([rows,n]) => loadCalc(rows,n)); build(); return {result, csv: toCSV(result.rows)}; }};
+render();
+</script>
+</body>
+</html>
